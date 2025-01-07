@@ -10,11 +10,11 @@ toks <- tokens(corp, remove_punct = TRUE, remove_symbols = TRUE) %>%
     tokens_tolower()
 toks_grp <- tokens_group(toks)
 
-wov <- word2vec(toks, dim = 50, iter = 10, min_count = 2, sample = 1)
-dov <- doc2vec(toks_grp, wov)
-dov_nm <- doc2vec(toks_grp, min_count = 10, sample = 1)
+wov <- textmodel_word2vec(toks, dim = 50, iter = 10, min_count = 2, sample = 1)
+dov <- textmodel_doc2vec(toks_grp, wov)
+dov_nm <- textmodel_doc2vec(toks_grp, min_count = 10, sample = 1)
 
-test_that("word2vec works", {
+test_that("textmodel_word2vec works", {
     
     # wordvector
     expect_equal(
@@ -30,7 +30,10 @@ test_that("word2vec works", {
         wov$window, 5L
     )
     expect_identical(
-        dim(wov$vectors), c(5360L, 50L)
+        dim(wov$values), c(5360L, 50L)
+    )
+    expect_identical(
+        dim(wov$weights), c(5360L, 50L)
     )
     expect_identical(
         wov$sample, 1.0
@@ -49,7 +52,8 @@ test_that("word2vec works", {
         paste(
             "",
             "Call:",
-            "word2vec(x = toks, dim = 50, min_count = 2, iter = 10, sample = 1)",
+            "textmodel_word2vec(x = toks, dim = 50, min_count = 2, iter = 10, ",
+            "    sample = 1)",
             "",
             "50 dimensions; 5,360 words.", sep = "\n"), fixed = TRUE
     )
@@ -59,7 +63,10 @@ test_that("word2vec works", {
     
     # docvector with model
     expect_equal(
-        dim(dov$vectors), c(59L, 50L)
+        dim(dov$values), c(59L, 50L)
+    )
+    expect_equal(
+        dim(dov$weights), c(5360L, 50L)
     )
     expect_equal(
         class(dov), "textmodel_docvector"
@@ -75,7 +82,7 @@ test_that("word2vec works", {
         paste(
             "",
             "Call:",
-            "doc2vec(x = toks_grp, model = wov)",
+            "textmodel_doc2vec(x = toks_grp, model = wov)",
             "",
             "50 dimensions; 59 documents.", sep = "\n"), fixed = TRUE
     )
@@ -84,13 +91,16 @@ test_that("word2vec works", {
     )
     expect_equal(
         names(dov),
-        c("vectors", "type", "dim", "min_count", "frequency", "window", "iter", 
-          "alpha", "use_ns", "ns_size", "sample", "concatenator", "call", "version")
+        c("values", "weights", "type", "dim", "min_count", "frequency", "window", "iter", 
+          "alpha", "use_ns", "ns_size", "sample", "normalize", "concatenator", "call", "version")
     )
     
     # docvector without model
     expect_identical(
-        dim(dov_nm$vectors), c(59L, 50L)
+        dim(dov_nm$values), c(59L, 50L)
+    )
+    expect_identical(
+        dim(dov_nm$weights), c(1405L, 50L)
     )
     expect_equal(
         class(dov_nm), "textmodel_docvector"
@@ -104,27 +114,71 @@ test_that("word2vec works", {
     
     expect_equal(
         names(dov_nm),
-        c("vectors", "type", "dim", "min_count", "frequency", "window", "iter", 
-          "alpha", "use_ns", "ns_size", "sample", "concatenator", "call", "version")
+        c("values", "weights", "type", "dim", "min_count", "frequency", "window", "iter", 
+          "alpha", "use_ns", "ns_size", "sample", "normalize", "concatenator", "call", "version")
     )
     
 })
 
-test_that("doc2vec works with different objects", {
+test_that("textmodel_doc2vec works with different objects", {
     
     expect_equal(
-        class(doc2vec(toks, wov)),
+        class(textmodel_doc2vec(toks, wov)),
         "textmodel_docvector"
     )
     
     expect_equal(
-        class(doc2vec(as.tokens_xptr(toks), wov)),
+        class(textmodel_doc2vec(as.tokens_xptr(toks), wov)),
         "textmodel_docvector"
     )
     
     expect_error(
-        doc2vec(toks, list),
+        textmodel_doc2vec(toks, list),
         "The object for 'model' must be a trained textmodel_wordvector"
     )
 })
+
+test_that("normalize is working", {
+    
+    skip_on_cran()
+    
+    wov0 <- textmodel_word2vec(toks, dim = 50, iter = 10, min_count = 2, sample = 1,
+                               normalize = FALSE)
+    expect_false(wov0$normalize)
+    
+    wov1 <- textmodel_word2vec(toks, dim = 50, iter = 10, min_count = 2, sample = 1,
+                               normalize = TRUE)
+    expect_true(wov1$normalize)
+    
+})
+
+test_that("textmodel_word2vec is robust", {
+    
+    expect_s3_class(
+        textmodel_word2vec(head(toks, 1), dim = 50, iter = 10, min_count = 1),
+        "textmodel_wordvector"
+    )
+    
+    expect_error(
+        suppressWarnings(
+            textmodel_word2vec(head(toks, 0), dim = 50, iter = 10, min_count = 1)
+        ),
+        "Failed to train word2vec"
+    )
+    
+    expect_error(
+        suppressWarnings(
+            textmodel_word2vec(toks, dim = 0, iter = 10, min_count = 1)
+        ),
+        "The value of dim must be between 2 and Inf"
+    )
+    
+    expect_error(
+        suppressWarnings(
+            textmodel_word2vec(toks, dim = 50, iter = 0, min_count = 1)
+        ),
+        "The value of iter must be between 1 and Inf"
+    )
+  
+})  
 

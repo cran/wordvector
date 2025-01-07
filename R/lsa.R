@@ -10,7 +10,8 @@
 #' @param verbose if `TRUE`, print the progress of training.
 #' @param ... additional arguments.
 #' @returns Returns a textmodel_wordvector object with the following elements:
-#'   \item{vectors}{a matrix for word vectors.}
+#'   \item{values}{a matrix for word vectors values.}
+#'   \item{weights}{a matrix for word vectors weights.}
 #'   \item{frequency}{the frequency of words in `x`.}
 #'   \item{engine}{the SVD engine used.}
 #'   \item{weight}{weighting scheme.}
@@ -35,19 +36,25 @@
 #'    tokens_tolower()
 #' 
 #' # train LSA
-#' lsa <- lsa(toks, dim = 50, min_count = 5, verbose = TRUE, )
-#' head(similarity(lsa, c("berlin", "germany", "france"), mode = "word"))
-#' analogy(lsa, ~ berlin - germany + france)
+#' lsa <- textmodel_lsa(toks, dim = 50, min_count = 5, verbose = TRUE)
+#' 
+#' # find similar words
+#' head(similarity(lsa, c("berlin", "germany", "france"), mode = "words"))
+#' head(similarity(lsa, c("berlin" = 1, "germany" = -1, "france" = 1), mode = "values"))
+#' head(similarity(lsa, analogy(~ berlin - germany + france)))
 #' }
-lsa <- function(x, dim = 50, min_count = 5L, engine = c("RSpectra", "irlba", "rsvd"), 
-                weight = "count", verbose = FALSE, ...) {
-    UseMethod("lsa")   
+textmodel_lsa <- function(x, dim = 50, min_count = 5L, 
+                          engine = c("RSpectra", "irlba", "rsvd"), 
+                          weight = "count", verbose = FALSE, ...) {
+    UseMethod("textmodel_lsa")   
 }
 
 #' @import quanteda
 #' @export
-lsa.tokens <- function(x, dim = 50L, min_count = 5L, engine = c("RSpectra", "irlba", "rsvd"), 
-                       weight = "count", verbose = FALSE, ...) {
+#' @method textmodel_lsa tokens
+textmodel_lsa.tokens <- function(x, dim = 50L, min_count = 5L, 
+                                 engine = c("RSpectra", "irlba", "rsvd"), 
+                                 weight = "count", verbose = FALSE, ...) {
     
     engine <- match.arg(engine)
     dim <- check_integer(dim, min = 2)
@@ -68,7 +75,7 @@ lsa.tokens <- function(x, dim = 50L, min_count = 5L, engine = c("RSpectra", "irl
         rownames(wov) <- featnames(x)
     }
     result <- list(
-        vectors = wov,
+        values = wov,
         dim = dim,
         min_count = min_count,
         frequency = featfreq(x),
@@ -104,3 +111,9 @@ get_svd <- function(x, k, engine, weight = "count", reduce = FALSE, ...) {
     }
     return(result)
 }
+
+lsa <- function(...) {
+    .Deprecated("textmodel_lsa")
+    textmodel_lsa(...)
+}
+

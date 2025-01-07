@@ -1,7 +1,7 @@
 Package: wordvector
 Type: Package
 Title: Word and Document Vector Models
-Version: 0.1.0
+Version: 0.2.0
 Authors@R: c(
     person('Kohei', 'Watanabe', role = c('aut', 'cre', 'cph'), email = 'watanabe.kohei@gmail.com', comment = c(ORCID = '0000-0001-6519-5265')), 
     person('Jan', 'Wijffels', role = 'aut', email = 'jwijffels@bnosac.be', comment = "Original R code"), 
@@ -21,11 +21,11 @@ LinkingTo: Rcpp, quanteda
 Language: en-US
 LazyData: true
 NeedsCompilation: yes
-Packaged: 2024-12-11 00:47:52 UTC; watan
+Packaged: 2025-01-07 21:59:32 UTC; watan
 Author: Kohei Watanabe [aut, cre, cph]
     (<https://orcid.org/0000-0001-6519-5265>),
   Jan Wijffels [aut] (Original R code),
   BNOSAC [cph] (Original R code),
   Max Fomichev [ctb, cph] (Original C++ code)
 Repository: CRAN
-Date/Publication: 2024-12-11 17:00:02 UTC
+Date/Publication: 2025-01-07 22:30:02 UTC

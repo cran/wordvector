@@ -2,39 +2,24 @@
 % Please edit documentation in R/utils.R
 \name{analogy}
 \alias{analogy}
-\title{[experimental] Find analogical relationships between words}
+\title{Convert formula to named character vector}
 \usage{
-analogy(x, formula, n = 10, exclude = TRUE, type = c("word", "simil"))
+analogy(formula)
 }
 \arguments{
-\item{x}{a \code{textmodel_wordvector} object.}
-
 \item{formula}{a \link{formula} object that defines the relationship between words
 using \code{+} or \code{-} operators.}
-
-\item{n}{the number of words in the resulting object.}
-
-\item{exclude}{if \code{TRUE}, words in \code{formula} are excluded from the result.}
-
-\item{type}{specify the type of vectors to be used. "word" is word vectors
-while "simil" is similarity vectors.}
 }
 \value{
-a \code{data.frame} with the words sorted and their cosine similarity sorted
-in descending order.
+a named character vector to be passed to \code{\link[=similarity]{similarity()}}.
 }
 \description{
-[experimental] Find analogical relationships between words
+Convert a formula to a named character vector in analogy tasks.
 }
 \examples{
-\donttest{
-# from Mikolov et al. (2023)
-analogy(wdv, ~ berlin - germany + france)
-analogy(wdv, ~ quick - quickly + slowly)
+analogy(~ berlin - germany + france)
+analogy(~ quick - quickly + slowly)
 }
-}
-\references{
-Mikolov, T., Sutskever, I., Chen, K., Corrado, G., & Dean, J. (2013).
-Distributed Representations of Words and Phrases and their Compositionality.
-http://arxiv.org/abs/1310.4546.
+\seealso{
+\code{\link[=similarity]{similarity()}}
 }

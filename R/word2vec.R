@@ -15,10 +15,12 @@
 #' @param ns_size the size of negative samples. Only used when `use_ns = TRUE`.
 #' @param sample the rate of sampling of words based on their frequency. Sampling is 
 #'   disabled when `sample = 1.0`
+#' @param normalize if `TRUE`, normalize the vectors in `values` and `weights`.
 #' @param verbose if `TRUE`, print the progress of training.
 #' @param ... additional arguments.
 #' @returns Returns a textmodel_wordvector object with the following elements:
-#'   \item{vectors}{a matrix for word vectors.}
+#'   \item{values}{a matrix for word vector values.}
+#'   \item{weights}{a matrix for word vector weights.}
 #'   \item{dim}{the size of the word vectors.}
 #'   \item{type}{the architecture of the model.}
 #'   \item{frequency}{the frequency of words in `x`.}
@@ -53,24 +55,30 @@
 #'    tokens_tolower()
 #'
 #' # train word2vec
-#' w2v <- word2vec(toks, dim = 50, type = "cbow", min_count = 5, sample = 0.001)
-#' head(similarity(w2v, c("berlin", "germany", "france"), mode = "word"))
-#' analogy(w2v, ~ berlin - germany + france)
+#' w2v <- textmodel_word2vec(toks, dim = 50, type = "cbow", min_count = 5, sample = 0.001)
+#'
+#' # find similar words
+#' head(similarity(w2v, c("berlin", "germany", "france"), mode = "words"))
+#' head(similarity(w2v, c("berlin" = 1, "germany" = -1, "france" = 1), mode = "values"))
+#' head(similarity(w2v, analogy(~ berlin - germany + france), mode = "words"))
 #' }
-word2vec <- function(x, dim = 50, type = c("cbow", "skip-gram"), 
-                     min_count = 5L, window = ifelse(type == "cbow", 5L, 10L), 
-                     iter = 10L, alpha = 0.05, use_ns = TRUE, ns_size = 5L, 
-                     sample = 0.001, verbose = FALSE, ...) {
-    UseMethod("word2vec")
+textmodel_word2vec <- function(x, dim = 50, type = c("cbow", "skip-gram"), 
+                               min_count = 5L, window = ifelse(type == "cbow", 5L, 10L), 
+                               iter = 10L, alpha = 0.05, use_ns = TRUE, ns_size = 5L, 
+                               sample = 0.001, normalize = TRUE,
+                               verbose = FALSE, ...) {
+    UseMethod("textmodel_word2vec")
 }
 
 #' @import quanteda
 #' @useDynLib wordvector
 #' @export
-word2vec.tokens <- function(x, dim = 50L, type = c("cbow", "skip-gram"), 
-                            min_count = 5L, window = ifelse(type == "cbow", 5L, 10L), 
-                            iter = 10L, alpha = 0.05, use_ns = TRUE, ns_size = 5L, 
-                            sample = 0.001, verbose = FALSE, ..., old = FALSE) {
+#' @method textmodel_word2vec tokens
+textmodel_word2vec.tokens <- function(x, dim = 50L, type = c("cbow", "skip-gram"), 
+                                      min_count = 5L, window = ifelse(type == "cbow", 5L, 10L), 
+                                      iter = 10L, alpha = 0.05, use_ns = TRUE, ns_size = 5L, 
+                                      sample = 0.001, normalize = TRUE,
+                                      verbose = FALSE, ..., old = FALSE) {
     
     type <- match.arg(type)
     dim <- check_integer(dim, min = 2)
@@ -81,6 +89,7 @@ word2vec.tokens <- function(x, dim = 50L, type = c("cbow", "skip-gram"),
     ns_size <- check_integer(ns_size, min_len = 1)
     alpha <- check_double(alpha, min = 0)
     sample <- check_double(sample, min = 0)
+    normalize <- check_logical(normalize)
     verbose <- check_logical(verbose)
 
     type <- match(type, c("cbow", "skip-gram"))
@@ -94,7 +103,7 @@ word2vec.tokens <- function(x, dim = 50L, type = c("cbow", "skip-gram"),
                       size = dim, window = window,
                       sample = sample, withHS = !use_ns, negative = ns_size, 
                       threads = get_threads(), iterations = iter,
-                      alpha = alpha, type = type, verbose = verbose)
+                      alpha = alpha, type = type, normalize = normalize, verbose = verbose)
     if (!is.null(result$message))
         stop("Failed to train word2vec (", result$message, ")")
 
@@ -102,6 +111,11 @@ word2vec.tokens <- function(x, dim = 50L, type = c("cbow", "skip-gram"),
     result$call <- try(match.call(sys.function(-1), call = sys.call(-1)), silent = TRUE)
     result$version <- utils::packageVersion("wordvector")
     return(result)
+}
+
+word2vec <- function(...) {
+    .Deprecated("textmodel_word2vec")
+    textmodel_word2vec(...)
 }
 
 #' Print method for trained word vectors
@@ -115,7 +129,7 @@ print.textmodel_wordvector <- function(x, ...) {
     cat("\nCall:\n")
     print(x$call)
     cat("\n", prettyNum(x$dim, big.mark = ","), " dimensions; ",
-        prettyNum(nrow(x$vectors), big.mark = ","), " words.",
+        prettyNum(nrow(x$values), big.mark = ","), " words.",
         "\n", sep = "")
     invisible(x)
 }
@@ -131,7 +145,7 @@ print.textmodel_docvector <- function(x, ...) {
     cat("\nCall:\n")
     print(x$call)
     cat("\n", prettyNum(x$dim, big.mark = ","), " dimensions; ",
-        prettyNum(nrow(x$vectors), big.mark = ","), " documents.",
+        prettyNum(nrow(x$values), big.mark = ","), " documents.",
         "\n", sep = "")
     invisible(x)
 }
@@ -145,5 +159,5 @@ print.textmodel_docvector <- function(x, ...) {
 #' @return a matrix that contain the word vectors in rows
 #' @export
 as.matrix.textmodel_wordvector <- function(x, ...){
-    return(x$vectors) 
+    return(x$values) 
 }

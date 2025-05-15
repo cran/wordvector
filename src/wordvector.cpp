@@ -1,12 +1,14 @@
 #include <Rcpp.h>
-//#include <iostream>
-//#include <iomanip>
 #include <chrono>
 #include <thread>
-//#include <unordered_map>
 #include <mutex>
 #include "word2vec/word2vec.hpp"
 #include "tokens.h"
+
+typedef XPtr<TokensObj> TokensPtr;
+typedef std::vector<std::string> vocabulary_t;
+typedef std::vector<float> wordvector_t;
+
 
 Rcpp::CharacterVector encode(std::vector<std::string> types){
     Rcpp::CharacterVector types_(types.size());
@@ -15,35 +17,58 @@ Rcpp::CharacterVector encode(std::vector<std::string> types){
         type_.set_encoding(CE_UTF8);
         types_[i] = type_;
     }
-    return(types_);
+    return types_;
 }
 
-Rcpp::NumericMatrix get_values(w2v::word2vec_t model, w2v::corpus_t corpus) {
+Rcpp::NumericMatrix get_values(w2v::word2vec_t model) {
     std::vector<float> mat = model.values();
-    if (model.vectorSize() * model.vocaburarySize() != mat.size())
+    if (model.vectorSize() * model.vocabularySize() != mat.size())
         throw std::runtime_error("Invalid model values");
-    Rcpp::NumericMatrix mat_(model.vectorSize(), model.vocaburarySize(), mat.begin());
-    colnames(mat_) = encode(corpus.words); 
+    Rcpp::NumericMatrix mat_(model.vectorSize(), model.vocabularySize(), mat.begin());
+    colnames(mat_) = encode(model.vocabulary()); 
     return Rcpp::transpose(mat_);
 }
 
-Rcpp::NumericMatrix get_weights(w2v::word2vec_t model, w2v::corpus_t corpus) {
+Rcpp::NumericMatrix get_weights(w2v::word2vec_t model) {
     std::vector<float> mat = model.weights();
-    if (model.vectorSize() * model.vocaburarySize() != mat.size())
+    if (model.vectorSize() * model.vocabularySize() != mat.size())
         throw std::runtime_error("Invalid model weights");
-    Rcpp::NumericMatrix mat_(model.vectorSize(), model.vocaburarySize(), mat.begin());
-    colnames(mat_) = encode(corpus.words); 
+    Rcpp::NumericMatrix mat_(model.vectorSize(), model.vocabularySize(), mat.begin());
+    colnames(mat_) = encode(model.vocabulary()); 
     return Rcpp::transpose(mat_);
 }
 
 Rcpp::NumericVector get_frequency(w2v::corpus_t corpus) {
-    Rcpp::NumericVector v = Rcpp::wrap(corpus.frequency);
-    v.names() = encode(corpus.words);
-    return(v);
+    Rcpp::NumericVector vec_ = Rcpp::wrap(corpus.frequency);
+    vec_.names() = encode(corpus.types);
+    return vec_;
+}
+
+w2v::word2vec_t as_word2vec(List model_) {
+    
+    w2v::word2vec_t model;
+    if (model_.length() == 0)
+        return model;
+        
+    Rcpp::NumericMatrix values_ = model_["values"];
+    Rcpp::NumericMatrix weights_ = model_["weights"];
+    
+    // columns are words internally
+    values_ = Rcpp::transpose(values_);
+    weights_ = Rcpp::transpose(weights_);
+    
+    CharacterVector vocabulary_ = colnames(values_);
+    vocabulary_t vocabulary = Rcpp::as<vocabulary_t>(vocabulary_);
+    
+    wordvector_t values = Rcpp::as<wordvector_t>(NumericVector(values_));
+    wordvector_t weights = Rcpp::as<wordvector_t>(NumericVector(weights_));
+    std::size_t vectorSize = values_.nrow();
+    
+    model = w2v::word2vec_t(vocabulary, vectorSize, values, weights);
+    return model;
 }
 
 /*
- uint16_t minWordFreq = 5; ///< discard words that appear less than minWordFreq times
  uint16_t size = 100; ///< word vector size
  uint16_t window = 5; ///< skip length between words
  uint16_t expTableSize = 1000; ///< exp(x) / (exp(x) + 1) values lookup table size
@@ -58,9 +83,7 @@ Rcpp::NumericVector get_frequency(w2v::corpus_t corpus) {
 */
 
 // [[Rcpp::export]]
-Rcpp::List cpp_w2v(Rcpp::List texts_, 
-                   Rcpp::CharacterVector words_, 
-                   uint16_t minWordFreq = 5,
+Rcpp::List cpp_w2v(TokensPtr xptr, 
                    uint16_t size = 100,
                    uint16_t window = 5,
                    float sample = 0.001,
@@ -72,8 +95,7 @@ Rcpp::List cpp_w2v(Rcpp::List texts_,
                    int type = 1,
                    bool verbose = false,
                    bool normalize = true,
-                   uint16_t expTableSize = 1000,
-                   uint16_t expValueMax = 6) {
+                   List model = R_NilValue) {
   
     if (verbose) {
         if (type == 1 || type == 10) {
@@ -84,21 +106,19 @@ Rcpp::List cpp_w2v(Rcpp::List texts_,
         Rprintf(" ...using %d threads for distributed computing\n", threads);
         Rprintf(" ...initializing\n");
     }
-
-    texts_t texts = Rcpp::as<texts_t>(texts_);
-    words_t words = Rcpp::as<words_t>(words_);
-    //texts_t texts = xptr->texts;
-    //types_t types = xptr->types;
     
-    w2v::corpus_t corpus(texts, words);
+    xptr->recompile();
+    texts_t texts = xptr->texts;
+    types_t types = xptr->types;
+    
+    w2v::corpus_t corpus(texts, types);
     corpus.setWordFreq();
       
-    w2v::settings_t settings;
-    settings.minWordFreq = minWordFreq;
+    w2v::settings_t settings;;
     settings.size = size;
     settings.window = window;
-    settings.expTableSize = expTableSize;
-    settings.expValueMax = expValueMax;
+    settings.expTableSize = 1000;
+    settings.expValueMax = 6;
     settings.sample = sample;
     settings.withHS = withHS;
     settings.negative = negative;
@@ -108,18 +128,13 @@ Rcpp::List cpp_w2v(Rcpp::List texts_,
     settings.type = type;
     settings.random = (uint32_t)(Rcpp::runif(1)[0] * std::numeric_limits<uint32_t>::max());
     settings.verbose = verbose;
-
+    
+    // NOTE: consider initializing models with corpus
+    w2v::word2vec_t word2vec_pre = as_word2vec(model);
     w2v::word2vec_t word2vec;
     bool trained;
     
-    if (verbose) {
-        if (withHS) {
-            Rprintf(" ...hierarchical softmax in %d iterations\n", iterations);
-        } else {
-            Rprintf(" ...negative sampling in %d iterations\n", iterations);
-        }
-    }    
-    trained = word2vec.train(settings, corpus);
+    trained = word2vec.train(settings, corpus, word2vec_pre);
     
     if (!trained) {
         Rcpp::List out = Rcpp::List::create(
@@ -131,17 +146,15 @@ Rcpp::List cpp_w2v(Rcpp::List texts_,
         if (verbose)
             Rprintf(" ...normalizing vectors\n");
         word2vec.normalizeValues();
-        word2vec.normalizeWeights();
     }
     if (verbose)
         Rprintf(" ...complete\n");
     
     Rcpp::List out = Rcpp::List::create(
-        Rcpp::Named("values") = get_values(word2vec, corpus), 
-        Rcpp::Named("weights") = get_weights(word2vec, corpus), 
+        Rcpp::Named("values") = get_values(word2vec), 
+        Rcpp::Named("weights") = get_weights(word2vec), 
         Rcpp::Named("type") = type,
         Rcpp::Named("dim") = size,
-        Rcpp::Named("min_count") = minWordFreq,
         Rcpp::Named("frequency") = get_frequency(corpus),
         Rcpp::Named("window") = window,
         Rcpp::Named("iter") = iterations,
@@ -154,4 +167,3 @@ Rcpp::List cpp_w2v(Rcpp::List texts_,
     out.attr("class") = "textmodel_wordvector";
     return out;
 }
-

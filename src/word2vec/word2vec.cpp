@@ -21,11 +21,12 @@ namespace w2v {
             m_vocabulary = corpus->types;
             m_vocabularySize = corpus->types.size();
             m_vectorSize = settings->size;
+            m_corpusSize = corpus->texts.size();
             
-            // TODO: pass corpus values to the model
-            // m_frequency = corpus->frequency;
-            // m_trainWords = corpus->trainWords;
             std::size_t matrixSize = m_vectorSize * m_vocabularySize;
+            std::size_t docMatrixSize = 0;
+            if (settings->type > 2) 
+                docMatrixSize = m_vectorSize * m_corpusSize;
             std::mt19937_64 randomGenerator(settings->random);
             int iter_max = settings->iterations;
             bool verbose = settings->verbose;
@@ -45,10 +46,17 @@ namespace w2v {
             data.corpus = corpus;
             
             // initialize variables
+            std::uniform_real_distribution<float> rndMatrixInitializer(-0.005f, 0.005f);
+            
+            // word vector
             data.bpWeights.reset(new std::vector<float>(matrixSize, 0.0f));
             data.pjLayerValues.reset(new std::vector<float>(matrixSize, 0.0f));
-            std::uniform_real_distribution<float> rndMatrixInitializer(-0.005f, 0.005f);
             std::generate((*data.pjLayerValues).begin(), (*data.pjLayerValues).end(), [&]() {
+                return rndMatrixInitializer(randomGenerator);
+            });
+            // document vector
+            data.docValues.reset(new std::vector<float>(docMatrixSize, 0.0f));
+            std::generate((*data.docValues).begin(), (*data.docValues).end(), [&]() {
                 return rndMatrixInitializer(randomGenerator);
             });
             data.expTable.reset(new std::vector<float>(settings->expTableSize));
@@ -79,7 +87,7 @@ namespace w2v {
                     if (auto it = map.find(_model.m_vocabulary[j]); it != map.end()) {
                         for (std::size_t k = 0; k < m_vectorSize; k++) {
                             (*data.pjLayerValues)[k + (it->second * m_vectorSize)] = _model.m_pjLayerValues[k + (j * _model.m_vectorSize)];
-                            //(*data.bpWeights)[k + (it->second * m_vectorSize)] = _model.m_bpWeights[k + (j * _model.m_vectorSize)];
+                            (*data.bpWeights)[k + (it->second * m_vectorSize)] = _model.m_bpWeights[k + (j * _model.m_vectorSize)];
                         }
                     }
                 }
@@ -136,6 +144,7 @@ namespace w2v {
             
             m_pjLayerValues = *data.pjLayerValues;
             m_bpWeights = *data.bpWeights;
+            m_docValues = *data.docValues;
             
             return true;
             

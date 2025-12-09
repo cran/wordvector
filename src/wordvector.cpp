@@ -4,6 +4,7 @@
 #include <mutex>
 #include "word2vec/word2vec.hpp"
 #include "tokens.h"
+#include "dev.h"
 
 typedef XPtr<TokensObj> TokensPtr;
 typedef std::vector<std::string> vocabulary_t;
@@ -20,22 +21,48 @@ Rcpp::CharacterVector encode(std::vector<std::string> types){
     return types_;
 }
 
-Rcpp::NumericMatrix get_values(w2v::word2vec_t model) {
-    std::vector<float> mat = model.values();
-    if (model.vectorSize() * model.vocabularySize() != mat.size())
-        throw std::runtime_error("Invalid model values");
-    Rcpp::NumericMatrix mat_(model.vectorSize(), model.vocabularySize(), mat.begin());
-    colnames(mat_) = encode(model.vocabulary()); 
-    return Rcpp::transpose(mat_);
+Rcpp::NumericMatrix as_matrix(std::vector<float> mat, 
+                              std::size_t nrow, std::size_t ncol) {
+    
+    if (mat.size() == 0)
+        return Rcpp::NumericMatrix();
+    if (nrow * ncol != mat.size())
+        throw std::runtime_error("Invalid matrix size");
+    Rcpp::NumericMatrix mat_(nrow, ncol);
+    for (std::size_t i = 0; i < nrow; ++i) {
+        for (std::size_t j = 0; j < ncol; ++j) {
+            mat_(i, j) = mat[i * ncol + j];
+        }
+    }
+    return mat_;
 }
+
 
 Rcpp::NumericMatrix get_weights(w2v::word2vec_t model) {
     std::vector<float> mat = model.weights();
     if (model.vectorSize() * model.vocabularySize() != mat.size())
-        throw std::runtime_error("Invalid model weights");
-    Rcpp::NumericMatrix mat_(model.vectorSize(), model.vocabularySize(), mat.begin());
-    colnames(mat_) = encode(model.vocabulary()); 
-    return Rcpp::transpose(mat_);
+        throw std::runtime_error("Invalid weight matrix");
+    Rcpp::NumericMatrix mat_ = as_matrix(mat, model.vocabularySize(), model.vectorSize());
+    rownames(mat_) = encode(model.vocabulary()); 
+    return mat_;
+}
+
+Rcpp::NumericMatrix get_words(w2v::word2vec_t model) {
+    std::vector<float> mat = model.values();
+    if (model.vectorSize() * model.vocabularySize() != mat.size())
+        throw std::runtime_error("Invalid word matrix");
+    Rcpp::NumericMatrix mat_ = as_matrix(mat, model.vocabularySize(), model.vectorSize());
+    rownames(mat_) = encode(model.vocabulary()); 
+    return mat_;
+}
+
+Rcpp::NumericMatrix get_documents(w2v::word2vec_t model) {
+    std::vector<float> mat = model.docValues();
+    if (model.vectorSize() * model.corpusSize() != mat.size())
+        throw std::runtime_error("Invalid document matrix");
+    Rcpp::NumericMatrix mat_ = as_matrix(mat, model.corpusSize(), model.vectorSize());
+    // TODO: add document names here
+    return mat_;
 }
 
 Rcpp::NumericVector get_frequency(w2v::corpus_t corpus) {
@@ -49,22 +76,34 @@ w2v::word2vec_t as_word2vec(List model_) {
     w2v::word2vec_t model;
     if (model_.length() == 0)
         return model;
-        
-    Rcpp::NumericMatrix values_ = model_["values"];
+    
+    std::size_t dim;
+    vocabulary_t vocabulary;
+    wordvector_t words, weights;
+    
+    // vector sizes
+    dim = as<Rcpp::IntegerVector>(model_["dim"])[0];
+    
+    // vocabulary
+    CharacterVector vocabulary_ = as<Rcpp::NumericVector>(model_["frequency"]).names();
+    vocabulary = Rcpp::as<vocabulary_t>(vocabulary_);
+    
+    // word vectors
+    Rcpp::List values_ = model_["values"];
+    if (values_.containsElementNamed("word")) {
+        Rcpp::NumericMatrix words_ = values_["word"];
+        words_ = Rcpp::transpose(words_); // columns are words internally
+        words = Rcpp::as<wordvector_t>(NumericVector(words_));
+    } else {
+        words = wordvector_t(dim * vocabulary.size()); // TODO: change to empty matrix
+    }
+    
+    // weights
     Rcpp::NumericMatrix weights_ = model_["weights"];
+    weights_ = Rcpp::transpose(weights_); // columns are words internally
+    weights = Rcpp::as<wordvector_t>(NumericVector(weights_));
     
-    // columns are words internally
-    values_ = Rcpp::transpose(values_);
-    weights_ = Rcpp::transpose(weights_);
-    
-    CharacterVector vocabulary_ = colnames(values_);
-    vocabulary_t vocabulary = Rcpp::as<vocabulary_t>(vocabulary_);
-    
-    wordvector_t values = Rcpp::as<wordvector_t>(NumericVector(values_));
-    wordvector_t weights = Rcpp::as<wordvector_t>(NumericVector(weights_));
-    std::size_t vectorSize = values_.nrow();
-    
-    model = w2v::word2vec_t(vocabulary, vectorSize, values, weights);
+    model = w2v::word2vec_t(vocabulary, dim, words, weights);
     return model;
 }
 
@@ -83,25 +122,32 @@ w2v::word2vec_t as_word2vec(List model_) {
 */
 
 // [[Rcpp::export]]
-Rcpp::List cpp_w2v(TokensPtr xptr, 
-                   uint16_t size = 100,
-                   uint16_t window = 5,
-                   float sample = 0.001,
-                   bool withHS = false,
-                   uint16_t negative = 5,
-                   uint16_t threads = 1,
-                   uint16_t iterations = 5,
-                   float alpha = 0.05,
-                   int type = 1,
-                   bool verbose = false,
-                   bool normalize = true,
-                   List model = R_NilValue) {
+Rcpp::List cpp_word2vec(TokensPtr xptr, 
+                        List model,
+                        uint16_t size = 100,
+                        uint16_t window = 5,
+                        float sample = 0.001,
+                        bool withHS = false,
+                        uint16_t negative = 5,
+                        uint16_t threads = 1,
+                        uint16_t iterations = 5,
+                        float alpha = 0.05,
+                        int type = 1,
+                        bool doc2vec = false,
+                        bool verbose = false,
+                        bool normalize = true) {
   
     if (verbose) {
-        if (type == 1 || type == 10) {
-            Rprintf("Training CBOW model with %d dimensions\n", size);
-        } else if (type == 2 || type == 20) {
+        if (type == 1) {
+            Rprintf("Training continuous BOW model with %d dimensions\n", size);
+        } else if (type == 2) {
             Rprintf("Training skip-gram model with %d dimensions\n", size);
+        } else if (type == 3) {
+            Rprintf("Training distributed memory model with %d dimensions\n", size);
+        } else if (type == 4) {
+            Rprintf("Training distributed BOW model with %d dimensions\n", size);
+        } else {
+            Rprintf("Training type %d model with %d dimensions\n", type, size);
         }
         Rprintf(" ...using %d threads for distributed computing\n", threads);
         Rprintf(" ...initializing\n");
@@ -142,16 +188,28 @@ Rcpp::List cpp_w2v(TokensPtr xptr,
         );
         return out;
     }
-    if (normalize) {
-        if (verbose)
-            Rprintf(" ...normalizing vectors\n");
-        word2vec.normalizeValues();
-    }
     if (verbose)
         Rprintf(" ...complete\n");
     
-    Rcpp::List out = Rcpp::List::create(
-        Rcpp::Named("values") = get_values(word2vec), 
+    Rcpp::List values;
+    if (doc2vec) {
+        if (type == 4) { // dbow
+            values = Rcpp::List::create(
+                Rcpp::Named("doc") = get_documents(word2vec)
+            );
+        } else { // dm
+            values = Rcpp::List::create(
+                Rcpp::Named("word") = get_words(word2vec), 
+                Rcpp::Named("doc") = get_documents(word2vec)
+            );
+        }
+    } else { // cbow, sg, dm
+        values = Rcpp::List::create(
+            Rcpp::Named("word") = get_words(word2vec)
+        );
+    }
+    Rcpp::List res = Rcpp::List::create(
+        Rcpp::Named("values") = values,
         Rcpp::Named("weights") = get_weights(word2vec), 
         Rcpp::Named("type") = type,
         Rcpp::Named("dim") = size,
@@ -164,6 +222,5 @@ Rcpp::List cpp_w2v(TokensPtr xptr,
         Rcpp::Named("sample") = sample,
         Rcpp::Named("normalize") = normalize
     );
-    out.attr("class") = "textmodel_wordvector";
-    return out;
+    return res;
 }

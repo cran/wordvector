@@ -7,9 +7,9 @@
 textmodel_word2vec(
   x,
   dim = 50,
-  type = c("cbow", "skip-gram"),
+  type = c("cbow", "sg", "dm"),
   min_count = 5,
-  window = ifelse(type == "cbow", 5, 10),
+  window = ifelse(type == "sg", 10, 5),
   iter = 10,
   alpha = 0.05,
   model = NULL,
@@ -27,7 +27,8 @@ textmodel_word2vec(
 
 \item{dim}{the size of the word vectors.}
 
-\item{type}{the architecture of the model; either "cbow" (continuous back of words) or "skip-gram".}
+\item{type}{the architecture of the model; either "cbow" (continuous back-of-words),
+"sg" (skip-gram), or "dm" (distributed memory).}
 
 \item{min_count}{the minimum frequency of the words. Words less frequent than
 this in \code{x} are removed before training.}
@@ -58,8 +59,8 @@ disabled when \code{sample = 1.0}}
 \item{...}{additional arguments.}
 }
 \value{
-Returns a textmodel_wordvector object with the following elements:
-\item{values}{a matrix for word vector values.}
+Returns a textmodel_word2vec object with the following elements:
+\item{values}{a list of a matrix for word vector values.}
 \item{weights}{a matrix for word vector weights.}
 \item{dim}{the size of the word vectors.}
 \item{type}{the architecture of the model.}
@@ -76,10 +77,14 @@ Returns a textmodel_wordvector object with the following elements:
 \item{version}{the version of the wordvector package.}
 }
 \description{
-Train a Word2vec model (Mikolov et al., 2023) in different architectures on a \link[quanteda:tokens]{quanteda::tokens} object.
+Train a word2vec model (Mikolov et al., 2013) using a \link[quanteda:tokens]{quanteda::tokens} object.
 }
 \details{
-User can changed the number of processors used for the parallel computing via
+If \code{type = "dm"}, it trains a doc2vec model but saves only
+word vectors to save storage space. \link{textmodel_doc2vec} should be
+used to access document vectors.
+
+Users can changed the number of processors used for the parallel computing via
 \code{options(wordvector_threads)}.
 }
 \examples{
@@ -96,12 +101,12 @@ toks <- tokens(corp, remove_punct = TRUE, remove_symbols = TRUE) \%>\%
    tokens_tolower()
 
 # train word2vec
-w2v <- textmodel_word2vec(toks, dim = 50, type = "cbow", min_count = 5, sample = 0.001)
+wov <- textmodel_word2vec(toks, dim = 50, type = "cbow", min_count = 5, sample = 0.001)
 
 # find similar words
-head(similarity(w2v, c("berlin", "germany", "france"), mode = "words"))
-head(similarity(w2v, c("berlin" = 1, "germany" = -1, "france" = 1), mode = "values"))
-head(similarity(w2v, analogy(~ berlin - germany + france), mode = "words"))
+head(similarity(wov, c("berlin", "germany", "france"), mode = "words"))
+head(similarity(wov, c("berlin" = 1, "germany" = -1, "france" = 1), mode = "values"))
+head(similarity(wov, analogy(~ berlin - germany + france), mode = "words"))
 }
 }
 \references{

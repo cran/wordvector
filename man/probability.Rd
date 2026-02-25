@@ -8,7 +8,8 @@ probability(
   x,
   targets,
   layer = c("words", "documents"),
-  mode = c("character", "numeric")
+  mode = c("character", "numeric"),
+  ...
 )
 }
 \arguments{
@@ -19,11 +20,13 @@ probability(
 \item{layer}{the layer based on which probabilities are computed.}
 
 \item{mode}{specify the type of resulting object.}
+
+\item{...}{passed to \code{as.matrix()}.}
 }
 \value{
 a matrix of words or documents sorted in descending order by the probability
 scores when \code{mode = "character"}; a matrix of the probability scores when \code{mode = "numeric"}.
-When \code{words} is a named numeric vector, probability scores are weighted by
+When \code{targets} is a named numeric vector, probability scores are weighted by
 the values.
 }
 \description{

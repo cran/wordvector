@@ -165,7 +165,7 @@ wordvector <- function(x, dim = 50, type = c("cbow", "sg", "dm", "dbow"),
     if (include_data) # NOTE: consider removing
         result$data <- y
     if (doc2vec) {
-        result$docvars <- docvars(x)
+        result$docvars <- attr(x, "docvars")
         rownames(result$docvars) <- docnames(x)
         rownames(result$values$doc) <- docnames(x)
     }
@@ -225,6 +225,8 @@ print.textmodel_doc2vec <- function(x, ...) {
 #' @param x a `textmodel_word2vec` or `textmodel_doc2vec` object.
 #' @param normalize if `TRUE`, returns normalized vectors.
 #' @param layer the layer from which the vectors are extracted.
+#' @param group \[experimental\] average sentence or paragraph vectors from the same document. 
+#'   Silently ignored when `layer = "words"`. 
 #' @param ... not used.
 #' @return a matrix that contain the word or document vectors in rows.
 #' @export

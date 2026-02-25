@@ -1,14 +1,14 @@
 Package: wordvector
 Type: Package
 Title: Word and Document Vector Models
-Version: 0.6.0
+Version: 0.6.1
 Authors@R: c(
     person('Kohei', 'Watanabe', role = c('aut', 'cre', 'cph'), email = 'watanabe.kohei@gmail.com', comment = c(ORCID = '0000-0001-6519-5265')), 
     person('Jan', 'Wijffels', role = 'aut', email = 'jwijffels@bnosac.be', comment = "Original R code"), 
     person('BNOSAC', role = 'cph', comment = "Original R code"),
     person('Max', 'Fomichev', role = c('ctb', 'cph'), comment = "Original C++ code"))
 Maintainer: Kohei Watanabe <watanabe.kohei@gmail.com>
-Description: Create dense vector representation of words and documents using 'quanteda'. Currently implements Word2vec (Mikolov et al., 2013) <doi:10.48550/arXiv.1310.4546> and Latent Semantic Analysis (Deerwester et al., 1990) <doi:10.1002/(SICI)1097-4571(199009)41:6%3C391::AID-ASI1%3E3.0.CO;2-9>.
+Description: Create dense vector representation of words and documents using 'quanteda'. Implements Word2vec (Mikolov et al., 2013) <doi:10.48550/arXiv.1310.4546>, Doc2vec (Le & Mikolov, 2014) <doi:10.48550/arXiv.1405.4053> and Latent Semantic Analysis (Deerwester et al., 1990) <doi:10.1002/(SICI)1097-4571(199009)41:6%3C391::AID-ASI1%3E3.0.CO;2-9>.
 URL: https://github.com/koheiw/wordvector
 License: Apache License (>= 2.0)
 Encoding: UTF-8
@@ -21,11 +21,11 @@ LinkingTo: Rcpp, quanteda
 Language: en-US
 LazyData: true
 NeedsCompilation: yes
-Packaged: 2025-12-08 23:37:52 UTC; watan
+Packaged: 2026-02-25 03:54:34 UTC; watan
 Author: Kohei Watanabe [aut, cre, cph] (ORCID:
     <https://orcid.org/0000-0001-6519-5265>),
   Jan Wijffels [aut] (Original R code),
   BNOSAC [cph] (Original R code),
   Max Fomichev [ctb, cph] (Original C++ code)
 Repository: CRAN
-Date/Publication: 2025-12-09 09:50:02 UTC
+Date/Publication: 2026-02-25 11:50:02 UTC

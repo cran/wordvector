@@ -43,7 +43,9 @@
 #'  used to access document vectors. 
 #'     
 #'  Users can changed the number of processors used for the parallel computing via
-#'  `options(wordvector_threads)`.
+#'  `options(wordvector_threads)`. When the value is large than one, the result 
+#'  of every execution becomes slightly different even if `set.seed()` is used because 
+#'  parameters are updated in different orders by the processors.
 #' 
 #' @references 
 #'   Mikolov, T., Sutskever, I., Chen, K., Corrado, G., & Dean, J. (2013). 
@@ -166,6 +168,7 @@ wordvector <- function(x, dim = 50, type = c("cbow", "sg", "dm", "dbow"),
         result$data <- y
     if (doc2vec) {
         result$docvars <- attr(x, "docvars")
+        result$ntoken <- ntoken(x, remove_padding = TRUE)
         rownames(result$docvars) <- docnames(x)
         rownames(result$values$doc) <- docnames(x)
     }

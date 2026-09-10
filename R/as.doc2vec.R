@@ -1,12 +1,12 @@
-#' Create distributed representation of documents
+#' Create a doc2vec model
 #' 
-#' Create distributed representation of documents as weighted word vectors.
+#' Create a doc2vec model as weighted word vectors.
 #' @param x a [quanteda::tokens] or [quanteda::dfm] object.
 #' @param model a textmodel_wordvector object.
 #' @param normalize if `TRUE`, normalized word vectors before creating document vectors.
 #' @param group_data if `TRUE`, apply `dfm_group(x)` before creating document vectors.
 #' @param ... additional arguments passed to [quanteda::object2id].
-#' @returns Returns a textmodel_docvector object with the following elements:
+#' @returns Returns a textmodel_doc2vec object with the following elements:
 #'   \item{values}{a list of matrices for word and document vectors.}
 #'   \item{dim}{the size of the document vectors.}
 #'   \item{concatenator}{the concatenator in `x`.}
@@ -27,10 +27,10 @@ as.textmodel_doc2vec.dfm <- function(x, model = NULL, normalize = FALSE,
                                      group_data = FALSE, ...) {
     
     model <- upgrade_pre06(model)
-    model <- check_model(model, c("word2vec", "lsa"))
+    model <- check_model(model, c("word2vec", "doc2vec", "lsa"))
     conc <- meta(x, field = "concatenator", type = "object")
 
-    wov <- as.matrix(model, normalize)
+    wov <- as.matrix(model, normalize, layer = "words")
     if (group_data)
         x <- dfm_group(x)
     x <- dfm_match(x, rownames(wov))

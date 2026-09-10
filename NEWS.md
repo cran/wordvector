@@ -1,3 +1,10 @@
+## Changes in v0.6.4
+
+- Add `as.textmodel_word2vec()` to convert a matrix to a `textmodel_word2vec` object.
+- Update `as.textmodel_doc2vec()` to support conversion from the distributed memory (DM) model.
+- Add generic methods for `probability()` and `similarity()`. 
+- Change `wordvector_threads` to `wordvector.threads` in options with backward compatibility.
+
 ## Changes in v0.6.3
 
 - Add `padding` to `as.matrix()` for using word2vec as a pre-trained model in **torch**.
